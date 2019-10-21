@@ -1,9 +1,18 @@
+"""Basic REST API using module level functions."""
+
 from flask import Flask
 from flask import jsonify
 from flask import request
 
+import argparse
+import os
+
+from lib import util
+
+PORT = 8000
+
 app = Flask(__name__)
-data = None
+source = util.Source()
 
 
 @app.route('/', methods=['HEAD'])
@@ -11,59 +20,86 @@ def root():
     return '', 204
 
 
-@app.route('/data', methods=['GET'])
+@app.route('/data', methods=('GET',))
 def get_ids():
-    ids = sorted(data.keys())
-    return jsonify(dict(ids=ids)), 200
+    body = dict(ids=sorted(source.keys()))
+    return jsonify(body), 200
 
 
-@app.route('/data/<path:data_id>', methods=['GET'])
-def get_data(data_id):
-    value = data.get(data_id)
-    status_code = 404 if value is None else 200
-    response = {data_id: value}
-    return jsonify(response), status_code
+@app.route('/data/<int:id>', methods=('GET',))
+def get_data(id):
+    body = dict(id=id)
+    data = source.get(id)
+    if data is not None:
+        body['data'] = data
+        return jsonify(body), 200
+
+    # not found
+    return jsonify(body), 404
 
 
-@app.route('/data', methods=['POST'])
+@app.route('/data', methods=('POST',))
 def create_data():
-    load = request.get_json()
+    json = request.get_json()
     try:
-        key = load['id']
-        value = load['value']
-    except KeyError:
-        return jsonify(dict(data=load)), 400
-    status_code = 201
-    if key not in data:
-        data[key] = value
-    else:
-        status_code = 409
-    return jsonify(dict(id=key)), status_code
+        data = json['data']
+    except (KeyError, TypeError):
+        body = dict(data=json)
+        return jsonify(body), 400
+
+    # return response
+    id = source.add(data)
+    body = dict(id=id)
+    return jsonify(body), 201
 
 
-@app.route('/data/<path:data_id>', methods=['PUT'])
-def update_data(data_id):
-    load = request.get_json()
+@app.route('/data/<int:id>', methods=['PUT'])
+def update_data(id):
+    json = request.get_json()
     try:
-        value = load['value']
-    except KeyError:
-        return jsonify(dict(data=load)), 400
+        data = json['data']
+    except (KeyError, TypeError):
+        return jsonify(dict(data=json)), 400
 
     # process valid request
-    data[data_id] = value
-    return jsonify(dict(id=data_id)), 200
+    body = dict(id=id)
+    if id == source.update(id, data):
+        return jsonify(body), 200
+
+    # not found
+    return jsonify(body), 404
 
 
-@app.route('/data/<path:data_id>', methods=['DELETE'])
-def delete_data(data_id):
-    status_code = 204
-    try:
-        del data[data_id]
-    except KeyError:
-        status_code = 404
-    return '', status_code
+@app.route('/data/<int:id>', methods=['DELETE'])
+def delete_data(id):
+    if id == source.delete(id):
+        return '', 204
+
+    # not found
+    return '', 404
 
 
 if __name__ == '__main__':
-    data = dict(alpha=1, beta=2, delta=3, gamma=4)
-    app.run(host='localhost', port=8000)
+    parser = argparse.ArgumentParser(description="Flask REST API.")
+    parser.add_argument(
+        '--host',
+        default='localhost',
+        help='server host (default: %(default)s)')
+    parser.add_argument(
+        '--port',
+        default=PORT,
+        help='server port (default: %(default)s)')
+
+    parser.add_argument(
+        '--data',
+        default=os.path.join(util.DATA_DIR, 'input.json'),
+        metavar='FILE',
+        help='path to JSON data file (default: %(default)s)')
+    args = parser.parse_args()
+
+    # set up data
+    for record in util.load_data(args.data):
+        source.add(record)
+
+    # run server
+    app.run(host=args.host, port=args.port)
