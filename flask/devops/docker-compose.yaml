@@ -1,0 +1,16 @@
+version: "2"
+services:
+  api-simple:
+    container_name: flask_api_simple
+    build:
+      context: ../
+      dockerfile: devops/api_simple/Dockerfile
+    ports:
+      - "8000:8000"
+  api-basic-auth:
+    container_name: flask_api_basic_auth
+    build:
+      context: ../
+      dockerfile: devops/api_basic_auth/Dockerfile
+    ports:
+      - "8001:8001"
