@@ -31,6 +31,14 @@ Build image:
 
 `docker build -f devops/<module>/Dockerfile -t <image>:latest .` 
 
+or:
+
+```
+cd devops/
+docker-compose build [service...]
+```
+
+
 Run image:
 
 `docker run -d <image>`
