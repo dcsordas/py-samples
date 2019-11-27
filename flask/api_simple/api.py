@@ -77,29 +77,3 @@ def delete_data(id):
 
     # not found
     return '', 404
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Flask REST API.")
-    parser.add_argument(
-        '--host',
-        default='localhost',
-        help='server host (default: %(default)s)')
-    parser.add_argument(
-        '--port',
-        default=PORT,
-        help='server port (default: %(default)s)')
-
-    parser.add_argument(
-        '--data',
-        default=os.path.join(util.DATA_DIR, 'input.json'),
-        metavar='FILE',
-        help='path to JSON data file (default: %(default)s)')
-    args = parser.parse_args()
-
-    # set up data
-    for record in util.load_data(args.data):
-        source.add(record)
-
-    # run server
-    app.run(host=args.host, port=args.port)

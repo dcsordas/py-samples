@@ -49,19 +49,3 @@ def register_user():
     else:
         source.set_credentials(username, util.hash_password(password))
         return '', 201
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Flask REST API.")
-    parser.add_argument(
-        '--host',
-        default='localhost',
-        help='server host (default: %(default)s)')
-    parser.add_argument(
-        '--port',
-        default=PORT,
-        help='server port (default: %(default)s)')
-    args = parser.parse_args()
-
-    # run server
-    app.run(host=args.host, port=args.port)
