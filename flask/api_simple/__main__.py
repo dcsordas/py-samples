@@ -12,7 +12,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Flask REST API (with simple module level end points).")
+    parser = argparse.ArgumentParser(description="Flask REST API (with api_simple module level end points).")
     parser.add_argument(
         '--host',
         default='localhost',

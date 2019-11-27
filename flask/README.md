@@ -24,13 +24,13 @@ or:
 `python -m <module> --test`
 
 
-simple
--
-
-Using module level functions only for end points.
-
-
-basic_auth
+api_basic_auth
 -
 
 With basic HTTP authentication.
+
+
+api_simple
+-
+
+Using module level functions only for end points.
