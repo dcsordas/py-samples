@@ -1,0 +1,9 @@
+version: "1.17.1"
+services:
+  api-simple:
+    container_name: flask_api_simple
+    build:
+      context: ../
+      dockerfile: devops/simple_api/Dockerfile
+    ports:
+      - "8000:8000"

@@ -10,7 +10,7 @@ Installation
 `pip install -r requirements.txt`
 
 
-Usage
+Usage: dev
 -
 
 `python -m <module> --help`
@@ -23,6 +23,21 @@ or:
 
 `python -m <module> --test`
 
+
+Usage: Docker
+-
+
+Build image:
+
+`docker build -f devops/<module>/Dockerfile -t <image>:latest .` 
+
+Run image:
+
+`docker run -d <image>`
+
+
+APIs
+=
 
 api_basic_auth
 -
