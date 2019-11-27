@@ -28,3 +28,9 @@ simple
 -
 
 Using module level functions only for end points.
+
+
+basic_auth
+-
+
+With basic HTTP authentication.
