@@ -24,12 +24,6 @@ if __name__ == '__main__':
         action='store_true',
         default=False,
         help='run tests')
-
-    parser.add_argument(
-        '--data',
-        default=os.path.join(util.DATA_DIR, 'input.json'),
-        metavar='FILE',
-        help='path to JSON data file (default: %(default)s)')
     args = parser.parse_args()
 
     # test
