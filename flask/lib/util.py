@@ -14,6 +14,23 @@ SQL_CREATE_TABLE_USER_DATA = """
               email TEXT UNIQUE NOT NULL) """
 
 
+def extract_data(request):
+    """
+Extract structured JSON content from HTTP request.
+
+    :param request: HTTP request object
+    :return: JSON content subset under 'data' key
+    """
+    json = request.get_json()
+    try:
+        data = json['data']
+    except (KeyError, TypeError):
+        raise
+    if not data:
+        raise ValueError('No data')
+    return data
+
+
 def hash_password(password):
     """
     Return SHA1 hash for input.
@@ -49,7 +66,6 @@ class Source(object):
         self._connection.close()
 
 
-# TODO table 'user_data' should be 'data'; rename everywhere
 class DataSource(Source):
     """SQLite data access object for 'user_data' table."""
 
@@ -72,33 +88,25 @@ class DataSource(Source):
 
     def add_data(self, name, username, email):
         with self._lock:
-            try:
-                with self._connection:
-                    cursor = self._connection.execute(
-                        "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
-                        (name, username, email))
-            except sqlite3.IntegrityError:
-                return None
-
+            with self._connection:
+                cursor = self._connection.execute(
+                    "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
+                    (name, username, email))
             return cursor.lastrowid
 
     def update_data(self, id, name, username, email):
         with self._lock:
-            try:
-                with self._connection:
-                    cursor = self._connection.execute(
-                        """
-                        UPDATE user_data
-                        SET name = ?,
-                            username = ?,
-                            email = ?
-                        WHERE id = ? """,
-                        (name, username, email, id))
-            except sqlite3.IntegrityError as e:
-                print(e)
-                return None
-
-            return cursor.rowcount
+            with self._connection:
+                cursor = self._connection.execute(
+                    """
+                    UPDATE user_data
+                    SET name = ?,
+                        username = ?,
+                        email = ?
+                    WHERE id = ? """,
+                    (name, username, email, id))
+            if cursor.rowcount != 1:
+                raise sqlite3.Error('UPDATE failed')
 
     def delete_data(self, id):
         with self._lock:
@@ -106,7 +114,7 @@ class DataSource(Source):
             with self._connection:
                 self._connection.execute("DELETE FROM user_data WHERE id = ?", (id,))
             if self._connection.total_changes - changes != 1:
-                raise sqlite3.Error()
+                raise sqlite3.Error('DELETE failed')
 
 
 class CredentialsSource(object):

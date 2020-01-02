@@ -8,6 +8,7 @@ from lib import util
 
 # base classes
 class BaseApiTestCase(unittest.TestCase):
+    """API test case parent class."""
     test_app = None
 
     @classmethod
@@ -20,8 +21,7 @@ class BaseApiTestCase(unittest.TestCase):
 
 
 class BaseApiTestCaseWithDB(BaseApiTestCase):
-    connection = None
-
+    """API test case parent class with in-memory database fixture."""
     test_connection = None
     test_source = None
 
@@ -33,8 +33,6 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
         with connection:
             connection.execute(util.SQL_CREATE_TABLE_USER_DATA)
         with connection:
-
-            # TODO need only a single record
             connection.executemany(
                 "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
                 (
@@ -51,16 +49,17 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
 
 # test classes
 class TestApiRoot(BaseApiTestCase):
+    """API root end point responses."""
 
     def test_HEADER(self):
         actual = self.test_app.head('/')
         self.assertEqual(
-            (actual.data, actual.status_code),
-            (b'', HTTPStatus.NO_CONTENT))
+            (actual.json, actual.status_code),
+            (None, HTTPStatus.NO_CONTENT))
 
 
 class TestApiData(BaseApiTestCaseWithDB):
-    """REST API responses."""
+    """API /data end point responses."""
 
     def test_data_GET(self):
         with mock.patch('api_simple.api.source', self.test_source):
@@ -73,7 +72,7 @@ class TestApiData(BaseApiTestCaseWithDB):
     def test_data_GET__ok(self):
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.get('/data/1')
-        expected_json = dict(id=1, data=dict(name='one', username='test1', email='test1@example.com'))
+        expected_json = dict(data=dict(name='one', username='test1', email='test1@example.com'))
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.OK))
@@ -81,7 +80,7 @@ class TestApiData(BaseApiTestCaseWithDB):
     def test_data_GET__not_found(self):
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.get('/data/3')
-        expected_json = dict(id=3)
+        expected_json = dict(error='Not found')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.NOT_FOUND))
@@ -100,7 +99,7 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = None
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.post('/data', json=dict(data=data))
-        expected_json = dict(data=data)
+        expected_json = dict(error='No data')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.BAD_REQUEST))
@@ -109,25 +108,24 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = dict(name='fail')
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.post('/data', json=dict(data=data))
-        expected_json = dict(data=data)
+        expected_json = dict(error='NOT NULL constraint failed: user_data.username')
         self.assertEqual(
             (actual.json, actual.status_code),
-            (expected_json, HTTPStatus.BAD_REQUEST))
+            (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
 
     def test_data_PUT__ok(self):
         data = dict(name='neo', username='1test', email='test1@example.org')
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.put('/data/1', json=dict(data=data))
-        expected_json = dict(id=1)
         self.assertEqual(
             (actual.json, actual.status_code),
-            (expected_json, HTTPStatus.OK))
+            (None, HTTPStatus.NO_CONTENT))
 
     def test_data_PUT__no_data(self):
         data = None
         with mock.patch('api_simple.api.source', self.test_source):
-            actual = self.test_app.put('/data/0', json=dict(data=data))
-        expected_json = dict(data=data)
+            actual = self.test_app.put('/data/1', json=dict(data=data))
+        expected_json = dict(error='No data')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.BAD_REQUEST))
@@ -135,31 +133,32 @@ class TestApiData(BaseApiTestCaseWithDB):
     def test_data_PUT__partial_data(self):
         data = dict(name='fail')
         with mock.patch('api_simple.api.source', self.test_source):
-            actual = self.test_app.put('/data/0', json=dict(data=data))
-        expected_json = dict(data=data)
+            actual = self.test_app.put('/data/1', json=dict(data=data))
+        expected_json = dict(error='NOT NULL constraint failed: user_data.username')
         self.assertEqual(
             (actual.json, actual.status_code),
-            (expected_json, HTTPStatus.NOT_FOUND))
+            (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
 
     def test_data_PUT__not_found(self):
         data = dict(name='three', username='test3', email='test3@example.com')
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.put('/data/3', json=dict(data=data))
-        expected_json = dict(data=data)
+        expected_json = dict(error='UPDATE failed')
         self.assertEqual(
             (actual.json, actual.status_code),
-            (expected_json, HTTPStatus.NOT_FOUND))
+            (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
 
     def test_data_DELETE__ok(self):
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.delete('/data/1')
         self.assertEqual(
-            (actual.data, actual.status_code),
-            (b'', HTTPStatus.NO_CONTENT))
+            (actual.json, actual.status_code),
+            (None, HTTPStatus.NO_CONTENT))
 
     def test_data_DELETE__not_found(self):
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.delete('/data/3')
+        expected_json = dict(error='DELETE failed')
         self.assertEqual(
-            (actual.data, actual.status_code),
-            (b'', HTTPStatus.NOT_FOUND))
+            (actual.json, actual.status_code),
+            (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
