@@ -6,8 +6,8 @@ from lib import util
 
 
 def main(args):
-    for record in util.load_data(args.data):
-        api.source.add(record)
+    connection = util.get_connection(args.database)
+    api.source = util.DataSource(connection)
     api.app.run(host=args.host, port=args.port)
 
 
@@ -25,14 +25,13 @@ if __name__ == '__main__':
         '--test',
         action='store_true',
         default=False,
-        help='run tests'
-    )
+        help='run tests')
 
     parser.add_argument(
-        '--data',
-        default=os.path.join(util.DATA_DIR, 'input.json'),
+        '--database',
+        default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
         metavar='FILE',
-        help='path to JSON data file (default: %(default)s)')
+        help='path to database file (default: %(default)s)')
     args = parser.parse_args()
 
     # test

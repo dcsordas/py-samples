@@ -1,9 +1,17 @@
 from hashlib import sha1
-import json
 import pprint
+import sqlite3
 import threading
 
 DATA_DIR = 'data'
+DEFAULT_DATABASE = 'database.sqlite3'
+
+SQL_CREATE_TABLE_USER_DATA = """
+            CREATE TABLE user_data (
+              id INTEGER PRIMARY KEY,
+              name TEXT NOT NULL,
+              username TEXT UNIQUE NOT NULL,
+              email TEXT UNIQUE NOT NULL) """
 
 
 def hash_password(password):
@@ -16,49 +24,89 @@ def hash_password(password):
     return sha1(password.encode()).hexdigest()
 
 
-def load_data(filepath):
+def get_connection(database):
     """
-    Return JSON from file path.
+    Return SQLite connection object.
 
-    :param filepath: path to JSON file
-    :return: JSON object
+    :param database: URI to database instance
+    :return: connection object
     """
-    with open(filepath, 'r') as f:
-        return json.load(f)
+    connection = sqlite3.connect(database)
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
 class Source(object):
-    storage = None
+    """Parent class for data access objects."""
+    _connection = None
+    _lock = None
 
-    def __init__(self):
-        self.storage = {}
+    def __init__(self, connection):
+        self._connection = connection
+        self._lock = threading.Lock()
 
-    def __str__(self):
-        return pprint.pformat(self.storage)
+    def __del__(self):
+        self._connection.close()
 
-    def keys(self):
-        return list(self.storage.keys())
 
-    def get(self, key):
-        return self.storage.get(key)
+# TODO table 'user_data' should be 'data'; rename everywhere
+class DataSource(Source):
+    """SQLite data access object for 'user_data' table."""
 
-    def add(self, record):
-        if self.storage.keys():
-            key = max(self.storage.keys()) + 1
-        else:
-            key = 0
-        self.storage[key] = record
-        return key
+    @staticmethod
+    def row_to_dict(row, filter_id=True):
+        return {key: row[key] for key in row.keys() if not (filter_id and key == 'id')}
 
-    def update(self, key, record):
-        if key in self.storage:
-            self.storage[key] = record
-            return key
+    def get_ids(self):
+        with self._connection:
+            cursor = self._connection.execute("SELECT id FROM user_data")
+        rs = cursor.fetchall()
+        return [row['id'] for row in rs]
 
-    def delete(self, key):
-        if key in self.storage:
-            del self.storage[key]
-            return key
+    def get_data(self, id):
+        with self._connection:
+            cursor = self._connection.execute("SELECT * FROM user_data WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        if row:
+            return self.row_to_dict(row)
+
+    def add_data(self, name, username, email):
+        with self._lock:
+            try:
+                with self._connection:
+                    cursor = self._connection.execute(
+                        "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
+                        (name, username, email))
+            except sqlite3.IntegrityError:
+                return None
+
+            return cursor.lastrowid
+
+    def update_data(self, id, name, username, email):
+        with self._lock:
+            try:
+                with self._connection:
+                    cursor = self._connection.execute(
+                        """
+                        UPDATE user_data
+                        SET name = ?,
+                            username = ?,
+                            email = ?
+                        WHERE id = ? """,
+                        (name, username, email, id))
+            except sqlite3.IntegrityError as e:
+                print(e)
+                return None
+
+            return cursor.rowcount
+
+    def delete_data(self, id):
+        with self._lock:
+            changes = self._connection.total_changes
+            with self._connection:
+                self._connection.execute("DELETE FROM user_data WHERE id = ?", (id,))
+            if self._connection.total_changes - changes != 1:
+                raise sqlite3.Error()
 
 
 class CredentialsSource(object):

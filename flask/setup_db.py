@@ -2,10 +2,12 @@
 
 import requests
 
+import os
 import sqlite3
 
+from lib import util
+
 URL_API_USERS = 'https://jsonplaceholder.typicode.com/users'
-URI_DATABASE = 'data/database.sqlite3'
 
 
 def download(url):
@@ -18,20 +20,15 @@ def download(url):
 
 def main():
     data = download(URL_API_USERS)
-    connection = sqlite3.connect(URI_DATABASE)
+    connection = sqlite3.connect(os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE))
     with connection:
-        connection.execute("DROP TABLE IF EXISTS users")
+        connection.execute("DROP TABLE IF EXISTS user_data")
     with connection:
-        connection.execute("""
-            CREATE TABLE users (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              username TEXT NOT NULL,
-              email TEXT NOT NULL) """)
-    values = [(user['name'], user['username'], user['email']) for user in data]
+        connection.execute(util.SQL_CREATE_TABLE_USER_DATA)
+    values = [(user_data['name'], user_data['username'], user_data['email']) for user_data in data]
     with connection:
         connection.executemany(
-            "INSERT INTO users (name, username, email) VALUES (?, ?, ?)",
+            "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
             values)
     connection.close()
 
