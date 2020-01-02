@@ -8,6 +8,7 @@ from flask import request
 PORT = 8000
 
 # TODO fix error handling for the entire API
+# TODO update Dockerfile too (add DB setup)
 app = Flask(__name__)
 source = None
 
