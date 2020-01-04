@@ -1,6 +1,4 @@
 """Basic HTTP authentication."""
-import argparse
-
 from flask import Flask
 from flask import g
 from flask import jsonify
@@ -13,12 +11,12 @@ PORT = 8001
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
-source = util.CredentialsSource()
+source = None
 
 
 @auth.verify_password
 def verify_password(username, password):
-    hash_code = source.get_password_hash(username)
+    hash_code = source.get_authentication_data(username)
     if not hash_code or hash_code != util.hash_password(password):
         return False
     g.user = username

@@ -6,6 +6,8 @@ from lib import util
 
 
 def main(args):
+    connection = util.get_connection(args.database)
+    api.source = util.CredentialsSource(connection)
     api.app.run(host=args.host, port=args.port)
 
 
@@ -24,6 +26,13 @@ if __name__ == '__main__':
         action='store_true',
         default=False,
         help='run tests')
+
+    # database
+    parser.add_argument(
+        '--database',
+        default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
+        metavar='FILE',
+        help='path to database file (default: %(default)s)')
     args = parser.parse_args()
 
     # test

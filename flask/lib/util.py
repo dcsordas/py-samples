@@ -1,5 +1,4 @@
 from hashlib import sha1
-import pprint
 import sqlite3
 import threading
 
@@ -16,7 +15,7 @@ SQL_CREATE_TABLE_USER_DATA = """
 
 def extract_data(request):
     """
-Extract structured JSON content from HTTP request.
+    Extract structured JSON content from HTTP request.
 
     :param request: HTTP request object
     :return: JSON content subset under 'data' key
@@ -117,30 +116,41 @@ class DataSource(Source):
                 raise sqlite3.Error('DELETE failed')
 
 
-class CredentialsSource(object):
-    storage = None
-    lock = None
-
-    def __init__(self):
-        self.storage = {}
-        self.lock = threading.Lock()
-
-    def __str__(self):
-        return pprint.pformat(self.storage)
+class CredentialsSource(Source):
+    """SQLite data access object for 'user_credentials' table."""
 
     def has_username(self, username):
-        """Return if username was found in storage."""
-        return username in self.storage
+        with self._connection:
+            cursor = self._connection.execute("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM user_credentials
+                  WHERE username = ? )
+            """, (username,))
+        row = cursor.fetchone()
+        return row[0]
 
     def get_usernames(self):
-        """Return list of registered usernames."""
-        return self.storage.keys()
+        with self._connection:
+            cursor = self._connection.execute("SELECT username FROM user_credentials")
+        rs = cursor.fetchall()
+        return [row['username'] for row in rs]
 
-    def get_password_hash(self, username):
-        """Return password hash if found (or None)."""
-        return self.storage.get(username)
+    def get_authentication_data(self, username):
+        # TODO add salt here as well
+        with self._connection:
+            cursor = self._connection.execute("""
+                SELECT password_hash
+                FROM user_credentials
+                WHERE username = ? """, (username, ))
+        row = cursor.fetchone()
+        if row:
+            return row['password_hash']
 
     def set_credentials(self, username, password_hash):
-        """Create or update credentials in database."""
-        with self.lock:
-            self.storage[username] = password_hash
+        with self._lock:
+            with self._connection:
+                cursor = self._connection.execute(
+                    "INSERT INTO user_credentials (username, password_hash) VALUES (?, ?)",
+                    (username, password_hash))
+            return cursor.lastrowid
