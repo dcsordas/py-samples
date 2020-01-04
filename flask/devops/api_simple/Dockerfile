@@ -13,6 +13,10 @@ WORKDIR /
 RUN apt-get update
 RUN pip install -r requirements.txt
 
+# set up SQLite database
+ADD data/ /data/
+RUN python -m api_basic_auth.db_setup
+
 # run
 CMD python -m api_simple
 EXPOSE 8000

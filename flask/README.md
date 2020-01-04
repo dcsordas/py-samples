@@ -15,6 +15,11 @@ Usage: dev
 
 `python -m <module> --help`
 
+Database needs only to be set up for creating required table(s) and preloading sample data (optional):
+
+`python -m <module>.db_setup --help`
+
+
 Running tests:
 
 `python -m <module>.test`
@@ -50,7 +55,7 @@ APIs
 api_basic_auth
 -
 
-With basic HTTP authentication.
+Basic HTTP authentication.
 
 
 api_simple

@@ -39,8 +39,8 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
             connection.executemany(
                 "INSERT INTO user_credentials (username, password_hash) VALUES (?, ?)",
                 (
-                    ('test1', util.hash_password('pw1')),
-                    ('test2', util.hash_password('pw2'))
+                    ('test1', api.hash_password('pw1')),
+                    ('test2', api.hash_password('pw2'))
                 )
             )
         self.test_connection = connection

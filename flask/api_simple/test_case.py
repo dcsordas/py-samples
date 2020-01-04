@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 
 from api_simple import api
+from api_simple import db_setup
 from lib import util
 
 
@@ -31,7 +32,7 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
         # set up database
         connection = util.get_connection(':memory:')
         with connection:
-            connection.execute(util.SQL_CREATE_TABLE_USER_DATA)
+            connection.execute(db_setup.SQL_CREATE_TABLE_USER_DATA)
         with connection:
             connection.executemany(
                 "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",

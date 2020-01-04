@@ -5,7 +5,7 @@ from flask import jsonify
 from flask import request
 from flask_httpauth import HTTPBasicAuth
 
-from lib import util
+from hashlib import sha1
 
 PORT = 8001
 
@@ -14,10 +14,20 @@ auth = HTTPBasicAuth()
 source = None
 
 
+def hash_password(password):
+    """
+    Return SHA1 hash for input.
+
+    :param password: password string
+    :return: password hash code
+    """
+    return sha1(password.encode()).hexdigest()
+
+
 @auth.verify_password
 def verify_password(username, password):
     hash_code = source.get_authentication_data(username)
-    if not hash_code or hash_code != util.hash_password(password):
+    if not hash_code or hash_code != hash_password(password):
         return False
     g.user = username
     return True
@@ -45,5 +55,5 @@ def register_user():
         body = request.form
         return jsonify(body), 422
     else:
-        source.set_credentials(username, util.hash_password(password))
+        source.set_credentials(username, hash_password(password))
         return '', 201

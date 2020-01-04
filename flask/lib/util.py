@@ -1,43 +1,8 @@
-from hashlib import sha1
 import sqlite3
 import threading
 
 DATA_DIR = 'data'
 DEFAULT_DATABASE = 'database.sqlite3'
-
-SQL_CREATE_TABLE_USER_DATA = """
-            CREATE TABLE user_data (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              username TEXT UNIQUE NOT NULL,
-              email TEXT UNIQUE NOT NULL) """
-
-
-def extract_data(request):
-    """
-    Extract structured JSON content from HTTP request.
-
-    :param request: HTTP request object
-    :return: JSON content subset under 'data' key
-    """
-    json = request.get_json()
-    try:
-        data = json['data']
-    except (KeyError, TypeError):
-        raise
-    if not data:
-        raise ValueError('No data')
-    return data
-
-
-def hash_password(password):
-    """
-    Return SHA1 hash for input.
-
-    :param password: password string
-    :return: password hash code
-    """
-    return sha1(password.encode()).hexdigest()
 
 
 def get_connection(database):

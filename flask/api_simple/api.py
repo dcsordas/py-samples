@@ -5,15 +5,30 @@ from flask import request
 
 import sqlite3
 
-from lib import util
-
 PORT = 8000
 
-# TODO update Dockerfile too (add DB setup)
 app = Flask(__name__)
 source = None
 
 
+def extract_data(request):
+    """
+    Extract structured JSON content from HTTP request.
+
+    :param request: HTTP request object
+    :return: JSON content subset under 'data' key
+    """
+    json = request.get_json()
+    try:
+        data = json['data']
+    except (KeyError, TypeError):
+        raise
+    if not data:
+        raise ValueError('No data')
+    return data
+
+
+# end points
 @app.route('/', methods=['HEAD'])
 def root():
     return '', 204
@@ -38,7 +53,7 @@ def get_data(id):
 @app.route('/data', methods=('POST',))
 def create_data():
     try:
-        data = util.extract_data(request)
+        data = extract_data(request)
     except Exception as error:
         return jsonify(dict(error=str(error))), 400
 
@@ -54,7 +69,7 @@ def create_data():
 @app.route('/data/<int:id>', methods=['PUT'])
 def update_data(id):
     try:
-        data = util.extract_data(request)
+        data = extract_data(request)
     except Exception as error:
         return jsonify(dict(error=str(error))), 400
 
