@@ -5,11 +5,11 @@ import sqlite3
 
 from lib import util
 
-# TODO add salt later (uuid.uuid4, CHAR(36))
 SQL_CREATE_TABLE_USER_CREDENTIALS = """
             CREATE TABLE user_credentials (
               username TEXT PRIMARY KEY,
-              password_hash CHAR(40) NOT NULL) """
+              password_hash CHAR(40) UNIQUE NOT NULL,
+              password_salt CHAR(36) UNIQUE NOT NULL) """
 
 
 def main(database):

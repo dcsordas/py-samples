@@ -90,8 +90,7 @@ class CredentialsSource(Source):
                 SELECT EXISTS (
                   SELECT 1
                   FROM user_credentials
-                  WHERE username = ? )
-            """, (username,))
+                  WHERE username = ? ) """, (username,))
         row = cursor.fetchone()
         return row[0]
 
@@ -102,20 +101,24 @@ class CredentialsSource(Source):
         return [row['username'] for row in rs]
 
     def get_authentication_data(self, username):
-        # TODO add salt here as well
         with self._connection:
             cursor = self._connection.execute("""
-                SELECT password_hash
+                SELECT password_hash,
+                       password_salt
                 FROM user_credentials
                 WHERE username = ? """, (username, ))
         row = cursor.fetchone()
-        if row:
-            return row['password_hash']
+        if not row:
+            raise sqlite3.Error('Not found')
+        return row['password_hash'], row['password_salt']
 
-    def set_credentials(self, username, password_hash):
+    def set_credentials(self, username, password_hash, salt):
         with self._lock:
             with self._connection:
-                cursor = self._connection.execute(
-                    "INSERT INTO user_credentials (username, password_hash) VALUES (?, ?)",
-                    (username, password_hash))
+                cursor = self._connection.execute("""
+                    INSERT INTO user_credentials (
+                      username,
+                      password_hash,
+                      password_salt)
+                    VALUES (?, ?, ?) """, (username, password_hash, salt))
             return cursor.lastrowid

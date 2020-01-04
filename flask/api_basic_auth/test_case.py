@@ -1,8 +1,9 @@
+from requests.auth import _basic_auth_str
+
 from http import HTTPStatus
 import unittest
 from unittest import mock
-
-from requests.auth import _basic_auth_str
+import uuid
 
 from api_basic_auth import api
 from api_basic_auth import db_setup
@@ -36,13 +37,16 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
         with connection:
             connection.execute(db_setup.SQL_CREATE_TABLE_USER_CREDENTIALS)
         with connection:
-            connection.executemany(
-                "INSERT INTO user_credentials (username, password_hash) VALUES (?, ?)",
-                (
-                    ('test1', api.hash_password('pw1')),
-                    ('test2', api.hash_password('pw2'))
-                )
-            )
+            values = []
+            for username, password in [('test1', 'pw1'), ('test2', 'pw2')]:
+                salt = str(uuid.uuid4())
+                values.append([username, api.hash_password(password, salt), salt])
+            connection.executemany("""
+                INSERT INTO user_credentials (
+                  username,
+                  password_hash,
+                  password_salt)
+                VALUES (?, ?, ?) """, values)
         self.test_connection = connection
         self.test_source = util.CredentialsSource(connection)
 
