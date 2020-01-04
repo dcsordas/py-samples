@@ -5,10 +5,10 @@ from . import api
 from lib import util
 
 
-def main(args):
-    connection = util.get_connection(args.database)
+def main(host, port, database):
+    connection = util.get_connection(database)
     api.source = util.DataSource(connection)
-    api.app.run(host=args.host, port=args.port)
+    api.app.run(host=host, port=port)
 
 
 if __name__ == '__main__':
@@ -41,4 +41,4 @@ if __name__ == '__main__':
 
     # run server
     else:
-        main(args)
+        main(args.host, args.port, args.database)
