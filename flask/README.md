@@ -62,3 +62,9 @@ api_simple
 -
 
 Using module level functions only for end points.
+
+
+api_view
+-
+
+Using View classes for end points.
