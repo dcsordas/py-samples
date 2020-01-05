@@ -1,25 +1,43 @@
 """Basic HTTP authentication."""
-import argparse
-
 from flask import Flask
 from flask import g
 from flask import jsonify
 from flask import request
 from flask_httpauth import HTTPBasicAuth
 
-from lib import util
+from hashlib import sha1
+import uuid
 
 PORT = 8001
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
-source = util.CredentialsSource()
+source = None
+
+
+def hash_password(password, salt):
+    """
+    Return SHA1 hash for input.
+
+    Note: Does not count as production eligible security measure.
+
+    :param password: password string
+    :param salt: salt string
+    :return: password hash code
+    """
+    encoded = (password + salt).encode()
+    return sha1(encoded).hexdigest()
 
 
 @auth.verify_password
 def verify_password(username, password):
-    hash_code = source.get_password_hash(username)
-    if not hash_code or hash_code != util.hash_password(password):
+    try:
+        hash_code, salt = source.get_authentication_data(username)
+    except:
+        return False
+
+    # verify
+    if hash_code != hash_password(password, salt):
         return False
     g.user = username
     return True
@@ -47,5 +65,7 @@ def register_user():
         body = request.form
         return jsonify(body), 422
     else:
-        source.set_credentials(username, util.hash_password(password))
+        salt = str(uuid.uuid4())
+        password_hash = hash_password(password, salt)
+        source.set_credentials(username, password_hash, salt)
         return '', 201

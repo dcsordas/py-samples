@@ -6,3 +6,10 @@ __pycache__/
 
 # PyCharm
 .idea/
+
+# data dir
+data/
+!data/.foo
+
+# SQLite
+*.sqlite3

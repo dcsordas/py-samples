@@ -1,90 +1,124 @@
-from hashlib import sha1
-import json
-import pprint
+import sqlite3
 import threading
 
 DATA_DIR = 'data'
+DEFAULT_DATABASE = 'database.sqlite3'
 
 
-def hash_password(password):
+def get_connection(database):
     """
-    Return SHA1 hash for input.
+    Return SQLite connection object.
 
-    :param password: password string
-    :return: password hash code
+    :param database: URI to database instance
+    :return: connection object
     """
-    return sha1(password.encode()).hexdigest()
-
-
-def load_data(filepath):
-    """
-    Return JSON from file path.
-
-    :param filepath: path to JSON file
-    :return: JSON object
-    """
-    with open(filepath, 'r') as f:
-        return json.load(f)
+    connection = sqlite3.connect(database)
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
 class Source(object):
-    storage = None
+    """Parent class for data access objects."""
+    _connection = None
+    _lock = None
 
-    def __init__(self):
-        self.storage = {}
+    def __init__(self, connection):
+        self._connection = connection
+        self._lock = threading.Lock()
 
-    def __str__(self):
-        return pprint.pformat(self.storage)
-
-    def keys(self):
-        return list(self.storage.keys())
-
-    def get(self, key):
-        return self.storage.get(key)
-
-    def add(self, record):
-        if self.storage.keys():
-            key = max(self.storage.keys()) + 1
-        else:
-            key = 0
-        self.storage[key] = record
-        return key
-
-    def update(self, key, record):
-        if key in self.storage:
-            self.storage[key] = record
-            return key
-
-    def delete(self, key):
-        if key in self.storage:
-            del self.storage[key]
-            return key
+    def __del__(self):
+        self._connection.close()
 
 
-class CredentialsSource(object):
-    storage = None
-    lock = None
+class DataSource(Source):
+    """SQLite data access object for 'user_data' table."""
 
-    def __init__(self):
-        self.storage = {}
-        self.lock = threading.Lock()
+    @staticmethod
+    def row_to_dict(row, filter_id=True):
+        return {key: row[key] for key in row.keys() if not (filter_id and key == 'id')}
 
-    def __str__(self):
-        return pprint.pformat(self.storage)
+    def get_ids(self):
+        with self._connection:
+            cursor = self._connection.execute("SELECT id FROM user_data")
+        rs = cursor.fetchall()
+        return [row['id'] for row in rs]
+
+    def get_data(self, id):
+        with self._connection:
+            cursor = self._connection.execute("SELECT * FROM user_data WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        if row:
+            return self.row_to_dict(row)
+
+    def add_data(self, name, username, email):
+        with self._lock:
+            with self._connection:
+                cursor = self._connection.execute(
+                    "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
+                    (name, username, email))
+            return cursor.lastrowid
+
+    def update_data(self, id, name, username, email):
+        with self._lock:
+            with self._connection:
+                cursor = self._connection.execute(
+                    """
+                    UPDATE user_data
+                    SET name = ?,
+                        username = ?,
+                        email = ?
+                    WHERE id = ? """,
+                    (name, username, email, id))
+            if cursor.rowcount != 1:
+                raise sqlite3.Error('UPDATE failed')
+
+    def delete_data(self, id):
+        with self._lock:
+            changes = self._connection.total_changes
+            with self._connection:
+                self._connection.execute("DELETE FROM user_data WHERE id = ?", (id,))
+            if self._connection.total_changes - changes != 1:
+                raise sqlite3.Error('DELETE failed')
+
+
+class CredentialsSource(Source):
+    """SQLite data access object for 'user_credentials' table."""
 
     def has_username(self, username):
-        """Return if username was found in storage."""
-        return username in self.storage
+        with self._connection:
+            cursor = self._connection.execute("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM user_credentials
+                  WHERE username = ? ) """, (username,))
+        row = cursor.fetchone()
+        return row[0]
 
     def get_usernames(self):
-        """Return list of registered usernames."""
-        return self.storage.keys()
+        with self._connection:
+            cursor = self._connection.execute("SELECT username FROM user_credentials")
+        rs = cursor.fetchall()
+        return [row['username'] for row in rs]
 
-    def get_password_hash(self, username):
-        """Return password hash if found (or None)."""
-        return self.storage.get(username)
+    def get_authentication_data(self, username):
+        with self._connection:
+            cursor = self._connection.execute("""
+                SELECT password_hash,
+                       password_salt
+                FROM user_credentials
+                WHERE username = ? """, (username, ))
+        row = cursor.fetchone()
+        if not row:
+            raise sqlite3.Error('Not found')
+        return row['password_hash'], row['password_salt']
 
-    def set_credentials(self, username, password_hash):
-        """Create or update credentials in database."""
-        with self.lock:
-            self.storage[username] = password_hash
+    def set_credentials(self, username, password_hash, salt):
+        with self._lock:
+            with self._connection:
+                cursor = self._connection.execute("""
+                    INSERT INTO user_credentials (
+                      username,
+                      password_hash,
+                      password_salt)
+                    VALUES (?, ?, ?) """, (username, password_hash, salt))
+            return cursor.lastrowid

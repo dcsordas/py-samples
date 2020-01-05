@@ -5,8 +5,10 @@ from . import api
 from lib import util
 
 
-def main(args):
-    api.app.run(host=args.host, port=args.port)
+def main(host, port, database):
+    connection = util.get_connection(database)
+    api.source = util.CredentialsSource(connection)
+    api.app.run(host=host, port=port)
 
 
 if __name__ == '__main__':
@@ -25,11 +27,12 @@ if __name__ == '__main__':
         default=False,
         help='run tests')
 
+    # database
     parser.add_argument(
-        '--data',
-        default=os.path.join(util.DATA_DIR, 'input.json'),
+        '--database',
+        default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
         metavar='FILE',
-        help='path to JSON data file (default: %(default)s)')
+        help='path to database file (default: %(default)s)')
     args = parser.parse_args()
 
     # test
@@ -39,4 +42,4 @@ if __name__ == '__main__':
 
     # run server
     else:
-        main(args)
+        main(args.host, args.port, args.database)
