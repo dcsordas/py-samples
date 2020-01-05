@@ -7,7 +7,7 @@ import sqlite3
 
 from lib.util import SourceView
 
-PORT = 8000
+PORT = 8002
 
 
 # view classes
