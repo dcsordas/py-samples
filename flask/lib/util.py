@@ -1,6 +1,8 @@
 import sqlite3
 import threading
 
+from flask.views import MethodView
+
 DATA_DIR = 'data'
 DEFAULT_DATABASE = 'database.sqlite3'
 
@@ -122,3 +124,28 @@ class CredentialsSource(Source):
                       password_salt)
                     VALUES (?, ?, ?) """, (username, password_hash, salt))
             return cursor.lastrowid
+
+
+class SourceView(MethodView):
+    """Parent class for MethodView objects handling data source and data extraction."""
+    source = None
+
+    def __init__(self, source):
+        self.source = source
+
+    @staticmethod
+    def extract_data(request):
+        """
+        Extract structured JSON content from HTTP request.
+
+        :param request: HTTP request object
+        :return: JSON content subset under 'data' key
+        """
+        json = request.get_json()
+        try:
+            data = json['data']
+        except (KeyError, TypeError):
+            raise
+        if not data:
+            raise ValueError('No data')
+        return data
