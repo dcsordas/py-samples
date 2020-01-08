@@ -1,0 +1,14 @@
+<h1>Home</h1>
+
+<h2>System check</h2>
+
+<p>It's alive</p>
+
+<table>
+    {% for key, value in status_report.items %}
+    <tr>
+        <td>{{key}}</td>
+        <td>{{value}}</td>
+    </tr>
+    {% endfor %}
+</table>
