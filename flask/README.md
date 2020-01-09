@@ -17,16 +17,16 @@ Usage: dev
 
 Database needs only to be set up for creating required table(s) and preloading sample data (optional):
 
-`python -m <module>.db_setup --help`
+`python -m <module> data --help`
+
+or:
+
+`python -m <module>.setup_db --help`
 
 
 Running tests:
 
-`python -m <module>.test`
-
-or:
-
-`python -m <module> --test`
+`python -m <module> test`
 
 
 Usage: Docker
@@ -68,3 +68,21 @@ api_view
 -
 
 Using View classes for end points.
+
+
+Tools
+=
+
+
+For development purposes only.
+
+Dump database
+-
+
+Install required package:
+
+`sudo apt install sqlite3`
+
+Dumping `user_data` table to `data/user_data.csv`:
+
+`tools/dump_user_data.sh`

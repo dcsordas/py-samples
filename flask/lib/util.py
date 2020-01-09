@@ -1,10 +1,21 @@
+from flask.views import MethodView
+import requests
+
 import sqlite3
 import threading
 
-from flask.views import MethodView
-
 DATA_DIR = 'data'
+DATA_FILE = 'user_data.csv'
 DEFAULT_DATABASE = 'database.sqlite3'
+URL_JSONPLACEHOLDER_API_USERS = 'https://jsonplaceholder.typicode.com/users'
+
+
+def download_data(url):
+    """Download JSON data from API."""
+    response = requests.get(url)
+    if response.status_code != 200:
+        response.raise_for_status()
+    return response.json()
 
 
 def get_connection(database):
