@@ -1,7 +1,6 @@
 """Set up simple SQLite database with sample data."""
-import requests
-
 import argparse
+import csv
 import os
 import sqlite3
 
@@ -14,28 +13,26 @@ SQL_CREATE_TABLE_USER_DATA = """
               username TEXT UNIQUE NOT NULL,
               email TEXT UNIQUE NOT NULL) """
 
-URL_API_USERS = 'https://jsonplaceholder.typicode.com/users'
 
-
-def download(url):
-    """Download JSON data from API."""
-    response = requests.get(url)
-    if response.status_code != 200:
-        response.raise_for_status()
-    return response.json()
-
-
-def main(database, data_from_url):
+def main(database, data_from_file, data_from_url):
     connection = sqlite3.connect(database)
     with connection:
         connection.execute("DROP TABLE IF EXISTS user_data")
     with connection:
         connection.execute(SQL_CREATE_TABLE_USER_DATA)
 
-    # add predefined data
-    if data_from_url:
-        data = download(URL_API_USERS)
-        values = [(user_data['name'], user_data['username'], user_data['email']) for user_data in data]
+    # insert data to database
+    data_source = None
+    if data_from_file:
+        with open(os.path.join(util.DATA_DIR, util.DATA_FILE)) as f:
+            reader = csv.DictReader(f)
+            data_source = [user_data for user_data in reader]
+    elif data_from_url:
+        data_source = util.download_data(util.URL_JSONPLACEHOLDER_API_USERS)
+    else:
+        exit(0)
+    if data_source is not None:
+        values = [(user_data['name'], user_data['username'], user_data['email']) for user_data in data_source]
         with connection:
             connection.executemany(
                 "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
@@ -51,9 +48,14 @@ if __name__ == '__main__':
         metavar='FILE',
         help='path to database file (default: %(default)s)')
     parser.add_argument(
+        '--data-from-file',
+        default=True,
+        action='store_false',
+        help='insert data loaded from %s (default: %%(default)s)' % os.path.join(util.DATA_DIR, util.DATA_FILE))
+    parser.add_argument(
         '--data-from-url',
         default=False,
         action='store_true',
-        help='add data downloaded from %s (default: %%(default)s)' % URL_API_USERS)
+        help='insert data downloaded from %s (default: %%(default)s)' % util.URL_JSONPLACEHOLDER_API_USERS)
     args = parser.parse_args()
-    main(args.database, args.data_from_url)
+    main(args.database, args.data_from_file, args.data_from_url)

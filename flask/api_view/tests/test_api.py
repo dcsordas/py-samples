@@ -4,7 +4,7 @@ import unittest
 from flask import Flask
 
 from api_view import api
-from api_view import db_setup
+from api_view import setup_db
 from lib import util
 
 
@@ -32,7 +32,7 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
         # set up database
         connection = util.get_connection(':memory:')
         with connection:
-            connection.execute(db_setup.SQL_CREATE_TABLE_USER_DATA)
+            connection.execute(setup_db.SQL_CREATE_TABLE_USER_DATA)
         with connection:
             connection.executemany(
                 "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",

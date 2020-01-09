@@ -15,7 +15,7 @@ RUN pip install -r requirements.txt
 
 # set up SQLite database
 ADD data/ /data/
-RUN python -m api_view.db_setup
+RUN python -m api_view.setup_db
 
 # run
 CMD python -m api_view
