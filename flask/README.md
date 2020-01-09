@@ -17,12 +17,16 @@ Usage: dev
 
 Database needs only to be set up for creating required table(s) and preloading sample data (optional):
 
+`python -m <module> data --help`
+
+or:
+
 `python -m <module>.setup_db --help`
 
 
 Running tests:
 
-`python -m <module> --test`
+`python -m <module> test`
 
 
 Usage: Docker

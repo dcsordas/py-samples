@@ -18,5 +18,5 @@ ADD data/ /data/
 RUN python -m api_basic_auth.setup_db
 
 # run
-CMD python -m api_simple
+CMD python -m api_simple run
 EXPOSE 8000
