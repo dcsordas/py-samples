@@ -3,8 +3,8 @@ import unittest
 
 from flask import Flask
 
-from . import api
-from . import db_setup
+from api_view import api
+from api_view import db_setup
 from lib import util
 
 

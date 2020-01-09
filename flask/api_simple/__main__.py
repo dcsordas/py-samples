@@ -25,7 +25,7 @@ if __name__ == '__main__':
         '--test',
         action='store_true',
         default=False,
-        help='run tests')
+        help='run tests and exit')
 
     parser.add_argument(
         '--database',
@@ -34,10 +34,10 @@ if __name__ == '__main__':
         help='path to database file (default: %(default)s)')
     args = parser.parse_args()
 
-    # test
+    # run tests
     if args.test:
-        from . import test
-        test.main()
+        from . import tests
+        tests.run()
 
     # run server
     else:

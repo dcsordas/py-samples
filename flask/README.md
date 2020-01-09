@@ -22,10 +22,6 @@ Database needs only to be set up for creating required table(s) and preloading s
 
 Running tests:
 
-`python -m <module>.test`
-
-or:
-
 `python -m <module> --test`
 
 
