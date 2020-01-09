@@ -8,7 +8,7 @@ from lib import util
 SQL_CREATE_TABLE_USER_CREDENTIALS = """
             CREATE TABLE user_credentials (
               username TEXT PRIMARY KEY,
-              password_hash CHAR(40) UNIQUE NOT NULL,
+              password_hash CHAR(64) UNIQUE NOT NULL,
               password_salt CHAR(36) UNIQUE NOT NULL) """
 
 

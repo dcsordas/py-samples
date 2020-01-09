@@ -5,7 +5,7 @@ from flask import jsonify
 from flask import request
 from flask_httpauth import HTTPBasicAuth
 
-from hashlib import sha1
+from hashlib import sha256
 import uuid
 
 PORT = 8001
@@ -17,7 +17,7 @@ source = None
 
 def hash_password(password, salt):
     """
-    Return SHA1 hash for input.
+    Return SHA256 hash for input.
 
     Note: Does not count as production eligible security measure.
 
@@ -26,7 +26,7 @@ def hash_password(password, salt):
     :return: password hash code
     """
     encoded = (password + salt).encode()
-    return sha1(encoded).hexdigest()
+    return sha256(encoded).hexdigest()
 
 
 @auth.verify_password
