@@ -8,6 +8,8 @@ from flask_httpauth import HTTPBasicAuth
 from hashlib import sha256
 import uuid
 
+from lib import util
+
 PORT = 8001
 
 app = Flask(__name__)
@@ -31,16 +33,16 @@ def hash_password(password, salt):
 
 @auth.verify_password
 def verify_password(username, password):
-    try:
-        hash_code, salt = source.get_authentication_data(username)
-    except:
-        return False
+    if source.has_username(username) is True:
+        result = source.get_authentication_data(username)
+        hash_code = result['password_hash']
+        salt = result['password_salt']
 
-    # verify
-    if hash_code != hash_password(password, salt):
-        return False
-    g.user = username
-    return True
+        # verify
+        if hash_code == hash_password(password, salt):
+            g.user = username
+            return True
+    return False
 
 
 # end points
@@ -67,5 +69,8 @@ def register_user():
     else:
         salt = str(uuid.uuid4())
         password_hash = hash_password(password, salt)
-        source.set_credentials(username, password_hash, salt)
-        return '', 201
+        try:
+            source.set_credentials(username, password_hash, salt)
+            return '', 201
+        except util.DatabaseError:
+            return jsonify(error='error registering user'), 500

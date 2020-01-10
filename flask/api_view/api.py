@@ -3,9 +3,7 @@ from flask import jsonify
 from flask import request
 from flask.views import MethodView
 
-import sqlite3
-
-from lib.util import SourceView
+from lib import util
 
 PORT = 8002
 
@@ -22,7 +20,7 @@ class RootView(MethodView):
         return '', 204
 
 
-class DataView(SourceView):
+class DataView(util.SourceView):
     """API data/ end point view."""
     source = None
 
@@ -32,10 +30,10 @@ class DataView(SourceView):
         app.add_url_rule(
             '/data',
             view_func=data_view,
-            defaults=dict(id=None),
+            defaults=dict(data_id=None),
             methods=('GET',))
         app.add_url_rule(
-            '/data/<int:id>',
+            '/data/<int:data_id>',
             view_func=data_view,
             methods=('GET', 'PUT', 'DELETE'))
         app.add_url_rule(
@@ -43,57 +41,58 @@ class DataView(SourceView):
             view_func=data_view,
             methods=('POST',))
 
-    def get(self, id):
-        if id is None:
+    def get(self, data_id):
+        if data_id is None:
 
             # list ids
-            ids = self.source.get_ids()
-            return jsonify(dict(ids=sorted(ids))), 200
+            data_ids = self.source.get_ids()
+            return jsonify(dict(ids=sorted(data_ids))), 200
         else:
 
             # get data
-            data = self.source.get_data(id)
+            data = self.source.get_data(data_id)
             if data:
                 return jsonify(dict(data=data)), 200
 
             # not found
-            return jsonify(error='Not found'), 404
+            return jsonify(error='data not found'), 404
 
     def post(self):
         try:
-            data = self.extract_data(request)
-        except Exception as error:
+            data = util.extract_data(request)
+        except ValueError as error:
             return jsonify(dict(error=str(error))), 400
 
         # process request
         try:
-            id = self.source.add_data(name=data.get('name'), username=data.get('username'), email=data.get('email'))
-        except sqlite3.Error as error:
-            return jsonify(error=str(error)), 500
+            data_id = self.source.add_data(name=data.get('name'), username=data.get('username'), email=data.get('email'))
+        except util.DatabaseError:
+            return jsonify(error='data not created'), 500
         else:
-            return jsonify(dict(id=id)), 201
+            return jsonify(dict(id=data_id)), 201
 
-    def put(self, id):
+    def put(self, data_id):
         try:
-            data = self.extract_data(request)
-        except Exception as error:
+            data = util.extract_data(request)
+        except ValueError as error:
             return jsonify(dict(error=str(error))), 400
 
         # process valid request
         try:
             self.source.update_data(
-                id=id, name=data.get('name'), username=data.get('username'), email=data.get('email'))
-        except sqlite3.Error as error:
-            return jsonify(dict(error=str(error))), 500
+                id=data_id, name=data.get('name'), username=data.get('username'), email=data.get('email'))
+        except util.DatabaseError:
+            return jsonify(dict(error='data not updated')), 500
         else:
             return '', 204
 
-    def delete(self, id):
+    def delete(self, data_id):
         try:
-            self.source.delete_data(id)
-        except sqlite3.Error as error:
-            return jsonify(dict(error=str(error))), 500
-        return '', 204
+            self.source.delete_data(data_id)
+        except util.DatabaseError:
+            return jsonify(dict(error='data not deleted')), 500
+        else:
+            return '', 204
 
 
 # Flask application wrapper

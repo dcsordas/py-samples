@@ -81,7 +81,7 @@ class TestApiData(BaseApiTestCaseWithDB):
     def test_data_GET__not_found(self):
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.get('/data/3')
-        expected_json = dict(error='Not found')
+        expected_json = dict(error='data not found')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.NOT_FOUND))
@@ -100,7 +100,7 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = None
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.post('/data', json=dict(data=data))
-        expected_json = dict(error='No data')
+        expected_json = dict(error='bad/no data in request')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.BAD_REQUEST))
@@ -109,7 +109,7 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = dict(name='fail')
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.post('/data', json=dict(data=data))
-        expected_json = dict(error='NOT NULL constraint failed: user_data.username')
+        expected_json = dict(error='data not created')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
@@ -126,7 +126,7 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = None
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.put('/data/1', json=dict(data=data))
-        expected_json = dict(error='No data')
+        expected_json = dict(error='bad/no data in request')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.BAD_REQUEST))
@@ -135,7 +135,7 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = dict(name='fail')
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.put('/data/1', json=dict(data=data))
-        expected_json = dict(error='NOT NULL constraint failed: user_data.username')
+        expected_json = dict(error='data not updated')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
@@ -144,7 +144,7 @@ class TestApiData(BaseApiTestCaseWithDB):
         data = dict(name='three', username='test3', email='test3@example.com')
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.put('/data/3', json=dict(data=data))
-        expected_json = dict(error='UPDATE failed')
+        expected_json = dict(error='data not updated')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))
@@ -159,7 +159,7 @@ class TestApiData(BaseApiTestCaseWithDB):
     def test_data_DELETE__not_found(self):
         with mock.patch('api_simple.api.source', self.test_source):
             actual = self.test_app.delete('/data/3')
-        expected_json = dict(error='DELETE failed')
+        expected_json = dict(error='data not deleted')
         self.assertEqual(
             (actual.json, actual.status_code),
             (expected_json, HTTPStatus.INTERNAL_SERVER_ERROR))

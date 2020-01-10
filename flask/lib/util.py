@@ -18,6 +18,24 @@ def download_data(url):
     return response.json()
 
 
+def extract_data(request):
+    """
+    Extract structured JSON content from HTTP request.
+
+    :param request: HTTP request object
+    :return: JSON content subset under 'data' key
+    """
+    json = request.get_json()
+    try:
+        data = json['data']
+    except (KeyError, TypeError):
+        raise ValueError('bad/no data in request')
+    else:
+        if not data:
+            raise ValueError('bad/no data in request')
+    return data
+
+
 def get_connection(database):
     """
     Return SQLite connection object.
@@ -28,6 +46,10 @@ def get_connection(database):
     connection = sqlite3.connect(database)
     connection.row_factory = sqlite3.Row
     return connection
+
+
+class DatabaseError(sqlite3.Error):
+    """Database error exception."""
 
 
 class Source(object):
@@ -42,13 +64,13 @@ class Source(object):
     def __del__(self):
         self._connection.close()
 
-
-class DataSource(Source):
-    """SQLite data access object for 'user_data' table."""
-
     @staticmethod
     def row_to_dict(row, filter_id=True):
         return {key: row[key] for key in row.keys() if not (filter_id and key == 'id')}
+
+
+class DataSource(Source):
+    """SQLite data access object for 'user_data' table."""
 
     def get_ids(self):
         with self._connection:
@@ -65,25 +87,31 @@ class DataSource(Source):
 
     def add_data(self, name, username, email):
         with self._lock:
-            with self._connection:
-                cursor = self._connection.execute(
-                    "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
-                    (name, username, email))
-            return cursor.lastrowid
+            try:
+                with self._connection:
+                    cursor = self._connection.execute(
+                        "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
+                        (name, username, email))
+                return cursor.lastrowid
+            except sqlite3.Error as error:
+                raise DatabaseError(error)
 
     def update_data(self, id, name, username, email):
         with self._lock:
-            with self._connection:
-                cursor = self._connection.execute(
-                    """
-                    UPDATE user_data
-                    SET name = ?,
-                        username = ?,
-                        email = ?
-                    WHERE id = ? """,
-                    (name, username, email, id))
+            try:
+                with self._connection:
+                    cursor = self._connection.execute(
+                        """
+                        UPDATE user_data
+                        SET name = ?,
+                            username = ?,
+                            email = ?
+                        WHERE id = ? """,
+                        (name, username, email, id))
+            except sqlite3.IntegrityError as error:
+                raise DatabaseError(error)
             if cursor.rowcount != 1:
-                raise sqlite3.Error('UPDATE failed')
+                raise DatabaseError('UPDATE failed')
 
     def delete_data(self, id):
         with self._lock:
@@ -91,7 +119,7 @@ class DataSource(Source):
             with self._connection:
                 self._connection.execute("DELETE FROM user_data WHERE id = ?", (id,))
             if self._connection.total_changes - changes != 1:
-                raise sqlite3.Error('DELETE failed')
+                raise DatabaseError('DELETE failed')
 
 
 class CredentialsSource(Source):
@@ -105,7 +133,7 @@ class CredentialsSource(Source):
                   FROM user_credentials
                   WHERE username = ? ) """, (username,))
         row = cursor.fetchone()
-        return row[0]
+        return bool(row[0])
 
     def get_usernames(self):
         with self._connection:
@@ -121,20 +149,21 @@ class CredentialsSource(Source):
                 FROM user_credentials
                 WHERE username = ? """, (username, ))
         row = cursor.fetchone()
-        if not row:
-            raise sqlite3.Error('Not found')
-        return row['password_hash'], row['password_salt']
+        return self.row_to_dict(row)
 
     def set_credentials(self, username, password_hash, salt):
         with self._lock:
-            with self._connection:
-                cursor = self._connection.execute("""
-                    INSERT INTO user_credentials (
-                      username,
-                      password_hash,
-                      password_salt)
-                    VALUES (?, ?, ?) """, (username, password_hash, salt))
-            return cursor.lastrowid
+            try:
+                with self._connection:
+                    cursor = self._connection.execute("""
+                        INSERT INTO user_credentials (
+                          username,
+                          password_hash,
+                          password_salt)
+                        VALUES (?, ?, ?) """, (username, password_hash, salt))
+                return cursor.lastrowid
+            except sqlite3.Error as error:
+                raise DatabaseError(error)
 
 
 class SourceView(MethodView):
@@ -143,20 +172,3 @@ class SourceView(MethodView):
 
     def __init__(self, source):
         self.source = source
-
-    @staticmethod
-    def extract_data(request):
-        """
-        Extract structured JSON content from HTTP request.
-
-        :param request: HTTP request object
-        :return: JSON content subset under 'data' key
-        """
-        json = request.get_json()
-        try:
-            data = json['data']
-        except (KeyError, TypeError):
-            raise
-        if not data:
-            raise ValueError('No data')
-        return data

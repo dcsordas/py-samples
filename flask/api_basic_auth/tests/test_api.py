@@ -74,15 +74,15 @@ class TestApiUsers(BaseApiTestCaseWithDB):
         with mock.patch('api_basic_auth.api.source', self.test_source):
             actual = self.test_app.get('/users', headers={"Authorization": _basic_auth_str(username, password)})
         self.assertEqual(
-            (actual.get_json(), actual.status_code),
+            (actual.json, actual.status_code),
             (dict(usernames=['test1', 'test2']), HTTPStatus.OK))
 
     def test_users_GET__unauthenticated(self):
         with mock.patch('api_basic_auth.api.source', self.test_source):
             actual = self.test_app.get('/users')
         self.assertEqual(
-            (actual.data, actual.status_code),
-            (b'Unauthorized Access', HTTPStatus.UNAUTHORIZED))
+            (actual.json, actual.status_code),
+            (None, HTTPStatus.UNAUTHORIZED))
 
     def test_users_GET__unauthorized(self):
         username = 'not_a_user'
@@ -90,8 +90,8 @@ class TestApiUsers(BaseApiTestCaseWithDB):
         with mock.patch('api_basic_auth.api.source', self.test_source):
             actual = self.test_app.get('/users', headers={"Authorization": _basic_auth_str(username, password)})
         self.assertEqual(
-            (actual.data, actual.status_code),
-            (b'Unauthorized Access', HTTPStatus.UNAUTHORIZED))
+            (actual.json, actual.status_code),
+            (None, HTTPStatus.UNAUTHORIZED))
 
     def test_users_POST__ok(self):
         username = 'test_user'
@@ -99,15 +99,29 @@ class TestApiUsers(BaseApiTestCaseWithDB):
         with mock.patch('api_basic_auth.api.source', self.test_source):
             actual = self.test_app.post('/users', data=dict(username=username, password=password))
         self.assertEqual(
-            (actual.data, actual.status_code, self.test_source.has_username(username)),
-            (b'', HTTPStatus.CREATED, True))
+            (actual.json, actual.status_code, self.test_source.has_username(username)),
+            (None, HTTPStatus.CREATED, True))
+
+    def test_users_POST__duplicate_username(self):
+        username = 'test_user'
+        password = 'test_password'
+        salt = str(uuid.uuid4())
+        self.test_source.set_credentials(
+            username,
+            api.hash_password(password, salt),
+            salt)
+        with mock.patch('api_basic_auth.api.source', self.test_source):
+            actual = self.test_app.post('/users', data=dict(username=username, password=password))
+        self.assertEqual(
+            (actual.json, actual.status_code, self.test_source.has_username(username)),
+            (dict(error='error registering user'), HTTPStatus.INTERNAL_SERVER_ERROR, True))
 
     def test_users_POST__missing_username(self):
         data = dict(password='test_password')
         with mock.patch('api_basic_auth.api.source', self.test_source):
             actual = self.test_app.post('/users', data=data)
         self.assertEqual(
-            (actual.get_json(), actual.status_code),
+            (actual.json, actual.status_code),
             (data, HTTPStatus.UNPROCESSABLE_ENTITY))
 
     def test_users_POST__missing_password(self):
@@ -116,5 +130,5 @@ class TestApiUsers(BaseApiTestCaseWithDB):
         with mock.patch('api_basic_auth.api.source', self.test_source):
             actual = self.test_app.post('/users', data=data)
         self.assertEqual(
-            (actual.get_json(), actual.status_code, self.test_source.has_username(username)),
+            (actual.json, actual.status_code, self.test_source.has_username(username)),
             (data, HTTPStatus.UNPROCESSABLE_ENTITY, False))
