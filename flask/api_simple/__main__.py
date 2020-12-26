@@ -51,16 +51,16 @@ if __name__ == '__main__':
         default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
         metavar='FILE',
         help='path to database file (default: %(default)s)')
-    cmd_data.add_argument(
-        '--data-from-file',
-        default=True,
-        action='store_false',
-        help='insert data loaded from %s (default: %%(default)s)' % os.path.join(util.DATA_DIR, util.DATA_FILE))
-    cmd_data.add_argument(
-        '--data-from-url',
-        default=False,
-        action='store_true',
-        help='insert data downloaded from %s (default: %%(default)s)' % util.URL_JSONPLACEHOLDER_API_USERS)
+    # cmd_data.add_argument(
+    #     '--data-from-file',
+    #     default=True,
+    #     action='store_false',
+    #     help='insert data loaded from %s (default: %%(default)s)' % os.path.join(util.DATA_DIR, util.DATA_FILE))
+    # cmd_data.add_argument(
+    #     '--data-from-url',
+    #     default=False,
+    #     action='store_true',
+    #     help='insert data downloaded from %s (default: %%(default)s)' % util.URL_JSONPLACEHOLDER_API_USERS)
 
     # parse and evaluate
     args = parser.parse_args()
@@ -69,7 +69,8 @@ if __name__ == '__main__':
         tests.run()
     elif args.command == 'data':
         from . import setup_db
-        setup_db.main(args.database, args.data_from_file, args.data_from_url)
+        setup_db.main()
+        # setup_db.main(args.database, args.data_from_file, args.data_from_url)
     elif args.command == 'run':
         main(args.host, args.port, args.database)
     else:

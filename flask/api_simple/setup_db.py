@@ -6,38 +6,77 @@ import sqlite3
 
 from lib import util
 
-SQL_CREATE_TABLE_USER_DATA = """
-            CREATE TABLE user_data (
-              id INTEGER PRIMARY KEY,
-              name TEXT NOT NULL,
-              username TEXT UNIQUE NOT NULL,
-              email TEXT UNIQUE NOT NULL) """
+# SQL_CREATE_TABLES = {
+#     'users': """
+#             CREATE TABLE users (
+#               id INTEGER PRIMARY KEY,
+#               name TEXT NOT NULL,
+#               username TEXT UNIQUE NOT NULL,
+#               email TEXT UNIQUE NOT NULL);""",
+#     'resources': """
+#             CREATE TABLE resources (
+#               id INTEGER PRIMARY KEY,
+#               name TEXT UNIQUE NOT NULL,
+#               type TEXT NOT NULL);""",
+#     'users_resources': """
+#             CREATE TABLE users_resources (
+#               id INTEGER PRIMARY KEY,
+#               user_id INTEGER NOT NULL,
+#               resource_id INTEGER NOT NULL,
+#               FOREIGN KEY (user_id) REFERENCES users (id),
+#               FOREIGN KEY (resource_id) REFERENCES resources (id),
+#               UNIQUE (user_id, resource_id));"""
+# }
 
 
-def main(database, data_from_file, data_from_url):
+def main(database):
     connection = sqlite3.connect(database)
-    with connection:
-        connection.execute("DROP TABLE IF EXISTS user_data")
-    with connection:
-        connection.execute(SQL_CREATE_TABLE_USER_DATA)
+    with open(os.path.join(util.DATA_DIR, 'schema.sql')) as schema_file:
+        schema_script = schema_file.read()
 
-    # insert data to database
-    data_source = None
-    if data_from_file:
-        with open(os.path.join(util.DATA_DIR, util.DATA_FILE)) as f:
-            reader = csv.DictReader(f)
-            data_source = [user_data for user_data in reader]
-    elif data_from_url:
-        data_source = util.download_data(util.URL_JSONPLACEHOLDER_API_USERS)
-    else:
-        exit(0)
-    if data_source is not None:
-        values = [(user_data['name'], user_data['username'], user_data['email']) for user_data in data_source]
+    with connection:
+        connection.executescript(schema_script)
+    print('... created schema')
+
+    # insert table rows
+    csv_dir = os.path.join(util.DATA_DIR, 'csv')
+    files = [
+        f
+        for f
+        in os.listdir(csv_dir)
+        if os.path.isfile(os.path.join(csv_dir, f)) and f.endswith('.csv')
+    ]
+    for fn in files:
+        with open(os.path.join(csv_dir, fn)) as csv_file:
+            reader = csv.DictReader(csv_file)
+            rows = [row for row in reader]
+        table = fn.split('.')[0]
+        columns = reader.fieldnames
+        query = "INSERT INTO {table} ({columns}) VALUES ({values})".format(
+            table=table,
+            columns=', '.join(columns),
+            values=', '.join(['?'] * len(columns))
+        )
         with connection:
             connection.executemany(
-                "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
-                values)
-        connection.close()
+                query,
+                ([row[column] for column in columns] for row in rows)
+            )
+        print('... populated table: {}'.format(table))
+
+    # TODO populate users_resources
+    relations = 3
+    user_resource_mappings = {}
+    resource_user_mappings = {}
+    with connection:
+        user_ids = [row[0] for row in connection.execute("SELECT id FROM users ORDER BY id;")]
+        resource_ids = [row[0] for row in connection.execute("SELECT id FROM resources ORDER BY id;")]
+    print(user_ids)
+    print(resource_ids)
+
+    connection.close()
+
+
 
 
 if __name__ == '__main__':
@@ -47,15 +86,10 @@ if __name__ == '__main__':
         default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
         metavar='FILE',
         help='path to database file (default: %(default)s)')
-    parser.add_argument(
-        '--data-from-file',
-        default=True,
-        action='store_false',
-        help='insert data loaded from %s (default: %%(default)s)' % os.path.join(util.DATA_DIR, util.DATA_FILE))
-    parser.add_argument(
-        '--data-from-url',
-        default=False,
-        action='store_true',
-        help='insert data downloaded from %s (default: %%(default)s)' % util.URL_JSONPLACEHOLDER_API_USERS)
+    # parser.add_argument(
+    #     '--data-from-file',
+    #     default=True,
+    #     action='store_false',
+    #     help='insert data loaded from %s (default: %%(default)s)' % os.path.join(util.DATA_DIR, util.DATA_FILE))
     args = parser.parse_args()
-    main(args.database, args.data_from_file, args.data_from_url)
+    main(args.database)

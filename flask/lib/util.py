@@ -1,39 +1,15 @@
 from flask.views import MethodView
-import requests
 
 import sqlite3
 import threading
 
 DATA_DIR = 'data'
-DATA_FILE = 'user_data.csv'
+DATA_USERS = 'user_data.csv'
+DATA_RESOURCES = 'computers.csv'
 DEFAULT_DATABASE = 'database.sqlite3'
-URL_JSONPLACEHOLDER_API_USERS = 'https://jsonplaceholder.typicode.com/users'
 
 
-def download_data(url):
-    """Download JSON data from API."""
-    response = requests.get(url)
-    if response.status_code != 200:
-        response.raise_for_status()
-    return response.json()
-
-
-def extract_data(request):
-    """
-    Extract structured JSON content from HTTP request.
-
-    :param request: HTTP request object
-    :return: JSON content subset under 'data' key
-    """
-    json = request.get_json()
-    try:
-        data = json['data']
-    except (KeyError, TypeError):
-        raise ValueError('bad/no data in request')
-    else:
-        if not data:
-            raise ValueError('bad/no data in request')
-    return data
+# TODO drop downloading from API
 
 
 def get_connection(database):
@@ -72,37 +48,37 @@ class Source(object):
 class DataSource(Source):
     """SQLite data access object for 'user_data' table."""
 
-    def get_ids(self):
+    def get_user_ids(self):
         with self._connection:
-            cursor = self._connection.execute("SELECT id FROM user_data")
+            cursor = self._connection.execute("SELECT id FROM users")
         rs = cursor.fetchall()
         return [row['id'] for row in rs]
 
-    def get_data(self, id):
+    def get_user(self, id):
         with self._connection:
-            cursor = self._connection.execute("SELECT * FROM user_data WHERE id = ?", (id,))
+            cursor = self._connection.execute("SELECT * FROM users WHERE id = ?", (id,))
         row = cursor.fetchone()
         if row:
             return self.row_to_dict(row)
 
-    def add_data(self, name, username, email):
+    def add_user(self, name, username, email):
         with self._lock:
             try:
                 with self._connection:
                     cursor = self._connection.execute(
-                        "INSERT INTO user_data (name, username, email) VALUES (?, ?, ?)",
+                        "INSERT INTO users (name, username, email) VALUES (?, ?, ?)",
                         (name, username, email))
                 return cursor.lastrowid
             except sqlite3.Error as error:
                 raise DatabaseError(error)
 
-    def update_data(self, id, name, username, email):
+    def update_user(self, id, name, username, email):
         with self._lock:
             try:
                 with self._connection:
                     cursor = self._connection.execute(
                         """
-                        UPDATE user_data
+                        UPDATE users
                         SET name = ?,
                             username = ?,
                             email = ?
@@ -113,11 +89,11 @@ class DataSource(Source):
             if cursor.rowcount != 1:
                 raise DatabaseError('UPDATE failed')
 
-    def delete_data(self, id):
+    def delete_user(self, id):
         with self._lock:
             changes = self._connection.total_changes
             with self._connection:
-                self._connection.execute("DELETE FROM user_data WHERE id = ?", (id,))
+                self._connection.execute("DELETE FROM users WHERE id = ?", (id,))
             if self._connection.total_changes - changes != 1:
                 raise DatabaseError('DELETE failed')
 
