@@ -19,4 +19,4 @@ RUN python -m api_view.setup_db
 
 # run
 CMD python -m api_view run
-EXPOSE 8002
+EXPOSE 8001

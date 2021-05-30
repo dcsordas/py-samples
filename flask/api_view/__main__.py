@@ -3,13 +3,12 @@ from flask import Flask
 import argparse
 import os
 
-from . import api
+from api_view import api
 from lib import util
 
 
 def main(host, port, database):
-    connection = util.get_connection(database)
-    source = util.DataSource(connection)
+    source = util.AdminSource(database)
 
     # init server
     app = Flask(api.__name__)
@@ -60,11 +59,6 @@ if __name__ == '__main__':
         metavar='FILE',
         help='path to database file (default: %(default)s)')
     cmd_data.add_argument(
-        '--data-from-file',
-        default=True,
-        action='store_false',
-        help='insert data loaded from %s (default: %%(default)s)' % os.path.join(util.DATA_DIR, util.DATA_FILE))
-    cmd_data.add_argument(
         '--data-from-url',
         default=False,
         action='store_true',
@@ -77,7 +71,7 @@ if __name__ == '__main__':
         tests.run()
     elif args.command == 'data':
         from . import setup_db
-        setup_db.main(args.database, args.data_from_file, args.data_from_url)
+        setup_db.main(args.database, args.data_from_url)
     elif args.command == 'run':
         main(args.host, args.port, args.database)
     else:

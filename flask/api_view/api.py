@@ -1,11 +1,13 @@
 """Object oriented REST API using View classes."""
+import uuid
+
 from flask import jsonify
 from flask import request
 from flask.views import MethodView
 
 from lib import util
 
-PORT = 8002
+PORT = 8001
 
 
 # view classes
@@ -20,37 +22,36 @@ class RootView(MethodView):
         return '', 204
 
 
-class DataView(util.SourceView):
+class AdminView(util.SourceView):
     """API data/ end point view."""
-    source = None
 
     @classmethod
     def register_view(cls, app, source):
-        data_view = cls.as_view('/data', source=source)
+        view = cls.as_view('/admin', source=source)
         app.add_url_rule(
-            '/data',
-            view_func=data_view,
-            defaults=dict(data_id=None),
+            '/admin/users',
+            view_func=view,
+            defaults=dict(user_id=None),
             methods=('GET',))
         app.add_url_rule(
-            '/data/<int:data_id>',
-            view_func=data_view,
+            '/admin/users/<int:user_id>',
+            view_func=view,
             methods=('GET', 'PUT', 'DELETE'))
         app.add_url_rule(
-            '/data',
-            view_func=data_view,
+            '/admin/users',
+            view_func=view,
             methods=('POST',))
 
-    def get(self, data_id):
-        if data_id is None:
+    def get(self, user_id):
+        if user_id is None:
 
-            # list ids
-            data_ids = self.source.get_ids()
-            return jsonify(dict(ids=sorted(data_ids))), 200
+            # list usernames
+            data = dict(data=sorted(self.source.get_usernames()))
+            return jsonify(data), 200
         else:
 
-            # get data
-            data = self.source.get_data(data_id)
+            # get user
+            data = self.source.get_user(user_id)
             if data:
                 return jsonify(dict(data=data)), 200
 
@@ -59,38 +60,42 @@ class DataView(util.SourceView):
 
     def post(self):
         try:
-            data = util.extract_data(request)
-        except ValueError as error:
-            return jsonify(dict(error=str(error))), 400
-
-        # process request
+            name = request.form['name']
+            username = request.form['username']
+            email = request.form['email']
+            password = request.form['password']
+        except KeyError:
+            body = request.form
+            return jsonify(body), 422
+        salt = str(uuid.uuid4())
+        password_hash = util.hash_password(password, salt)
         try:
-            data_id = self.source.add_data(name=data.get('name'), username=data.get('username'), email=data.get('email'))
+            user_id = self.source.add_user(name, username, email, password_hash, salt)
+            return jsonify(data=dict(id=user_id)), 201
         except util.DatabaseError:
-            return jsonify(error='data not created'), 500
-        else:
-            return jsonify(dict(id=data_id)), 201
+            return jsonify(error='error registering user'), 500
 
-    def put(self, data_id):
+    def put(self, user_id):
+        if not request.form:
+            return jsonify(dict(error='bad/no data in request')), 400
         try:
-            data = util.extract_data(request)
-        except ValueError as error:
-            return jsonify(dict(error=str(error))), 400
-
-        # process valid request
-        try:
-            self.source.update_data(
-                id=data_id, name=data.get('name'), username=data.get('username'), email=data.get('email'))
+            self.source.update_user(
+                user_id,
+                name=request.form.get('name'),
+                username=request.form.get('username'),
+                email=request.form.get('email'),
+                password=request.form.get('password')
+            )
         except util.DatabaseError:
             return jsonify(dict(error='data not updated')), 500
         else:
             return '', 204
 
-    def delete(self, data_id):
+    def delete(self, user_id):
         try:
-            self.source.delete_data(data_id)
+            self.source.delete_user(user_id)
         except util.DatabaseError:
-            return jsonify(dict(error='data not deleted')), 500
+            return jsonify(dict(error=str('data not deleted'))), 500
         else:
             return '', 204
 
@@ -98,7 +103,7 @@ class DataView(util.SourceView):
 # Flask application wrapper
 class ApiServer(object):
     app = None
-    views = (RootView, DataView)
+    views = (RootView, AdminView)
 
     def __init__(self, app):
         self.app = app

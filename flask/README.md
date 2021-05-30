@@ -52,11 +52,6 @@ Run image:
 APIs
 =
 
-api_basic_auth
--
-
-Basic HTTP authentication.
-
 
 api_simple
 -
@@ -67,7 +62,7 @@ Using module level functions only for end points.
 api_view
 -
 
-Using View classes for end points.
+Using `View` classes for end points.
 
 
 Tools
@@ -82,7 +77,3 @@ Dump database
 Install required package:
 
 `sudo apt install sqlite3`
-
-Dumping `user_data` table to `data/user_data.csv`:
-
-`tools/dump_user_data.sh`
