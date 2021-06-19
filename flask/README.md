@@ -9,13 +9,19 @@ Installation
 
 `pip install -r requirements.txt`
 
+Create a copy of `config_example.ini` as `config.ini`.
+
 
 Usage: dev
 -
 
+Requires `api-db` service running in Docker (see below).
+
+Usage:
+
 `python -m <module> --help`
 
-Database needs only to be set up for creating required table(s) and preloading sample data (optional):
+Set up database with initial data (including `admin:admin` user):
 
 `python -m <module> data --help`
 
@@ -48,6 +54,13 @@ Run image:
 
 `docker run -d <image>`
 
+### Build and run `api-db`
+
+```
+cd devops/
+docker-compose up -d api-db
+```
+
 
 APIs
 =
@@ -63,17 +76,3 @@ api_view
 -
 
 Using `View` classes for end points.
-
-
-Tools
-=
-
-
-For development purposes only.
-
-Dump database
--
-
-Install required package:
-
-`sudo apt install sqlite3`

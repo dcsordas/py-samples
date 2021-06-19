@@ -5,6 +5,8 @@ services:
     build:
       context: ../
       dockerfile: devops/api_simple/Dockerfile
+    depends_on:
+      - api-db
     ports:
       - "8000:8000"
   api-view:
@@ -12,10 +14,19 @@ services:
     build:
       context: ../
       dockerfile: devops/api_view/Dockerfile
+    depends_on:
+      - api-db
     ports:
       - "8001:8001"
   api-db:
+    image: devops_api-db
     container_name: flask_api_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
     build:
       context: ../
       dockerfile: devops/api_db/Dockerfile
+    ports:
+      - '5432:5432'

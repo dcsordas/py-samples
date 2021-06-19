@@ -1,5 +1,4 @@
-### Python template
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,5 +6,5 @@ __pycache__/
 # PyCharm
 .idea/
 
-# SQLite
-*.sqlite3
+# configuration
+config.ini

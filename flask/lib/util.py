@@ -1,7 +1,9 @@
+from configparser import ConfigParser
 from hashlib import sha256
 import threading
 import uuid
 
+import psycopg2
 from flask import g
 from flask.views import MethodView
 import requests
@@ -9,10 +11,12 @@ import requests
 import sqlite3
 
 from flask_httpauth import HTTPBasicAuth
+from psycopg2.extras import DictCursor
 
+CONFIG_FILE = 'config.ini'
 DATA_DIR = 'data'
-DEFAULT_DATABASE = 'database.sqlite3'
-TEST_DATABASE = 'test.sqlite3'
+DEFAULT_DATABASE = 'api'
+TEST_DATABASE = 'test'
 URL_JSONPLACEHOLDER_API_USERS = 'https://jsonplaceholder.typicode.com/users'
 
 
@@ -42,27 +46,32 @@ def extract_data(request):
     return data
 
 
-def get_connection(database):
-    """
-    Return SQLite connection object.
+def build_dns(**overrides):
+    with open(CONFIG_FILE, 'r') as f:
+        parser = ConfigParser()
+        parser.read_file(f)
+        params = {}
+        for key, value in parser.items('postgresql'):
+            if key in overrides:
+                params[key] = overrides[key]
+            else:
+                params[key] = value
+        return ' '.join([f"{k}='{v}'" for k, v in params.items()])
 
-    :param database: URI to database instance
-    :return: connection object
-    """
-    connection = sqlite3.connect(database)
-    connection.row_factory = sqlite3.Row
-    return connection
+
+def connection(dns=None):
+    dns = dns or build_dns()
+    return psycopg2.connect(dns, cursor_factory=DictCursor)
 
 
 def insert_user(connection, name, username, email=None, password=None):
     email = email or '{}@example.com'.format(username)
     password_salt = str(uuid.uuid4())
     password_hash = hash_password(password or username, password_salt)
-    with connection:
-        connection.execute(
-            "INSERT INTO users (name, username, email, password_salt, password_hash) VALUES (?, ?, ?, ?, ?)",
-            (name, username, email, password_salt, password_hash)
-        )
+    connection.cursor().execute(
+        "INSERT INTO users (name, username, email, password_salt, password_hash) VALUES (%s, %s, %s, %s, %s);",
+        (name, username, email, password_salt, password_hash)
+    )
 
 
 def hash_password(password, salt):
@@ -85,15 +94,16 @@ class DatabaseError(sqlite3.Error):
 
 class Source(object):
     """Parent class for data access objects."""
-    _database = None
+    _dns = None
     _lock = None
 
-    def __init__(self, database):
-        self._database = database
+    def __init__(self, dns):
+        print(dns)
+        self._dns = dns
         self._lock = threading.Lock()
 
     def get_connection(self):
-        return get_connection(self._database)
+        return psycopg2.connect(self._dns, cursor_factory=DictCursor)
 
     @staticmethod
     def row_to_dict(row, filter_id=True):
@@ -101,18 +111,18 @@ class Source(object):
 
 
 class AdminSource(Source):
-    """SQLite data access object for 'users' table."""
+    """Data access object for 'users' table."""
 
     def get_ids(self):
-        with self.get_connection() as connection:
-            cursor = connection.execute("SELECT id FROM users")
-        rs = cursor.fetchall()
+        with self.get_connection().cursor() as cursor:
+            cursor.execute("SELECT id FROM users;")
+            rs = cursor.fetchall()
         return [row['id'] for row in rs]
 
     def get_user(self, user_id):
-        with self.get_connection() as connection:
-            cursor = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-        row = cursor.fetchone()
+        with self.get_connection().cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE id = %s;", (user_id,))
+            row = cursor.fetchone()
         if row:
             return self.row_to_dict(row)
 
@@ -120,21 +130,24 @@ class AdminSource(Source):
         with self._lock:
             try:
                 with self.get_connection() as connection:
-                    cursor = connection.execute(
-                        """
-                        INSERT INTO users (name, username, email, password_hash, password_salt)
-                            VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (name, username, email, password_hash, password_salt))
-                return cursor.lastrowid
-            except sqlite3.Error as error:
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO users (name, username, email, password_hash, password_salt)
+                                VALUES (%s, %s, %s, %s, %s)
+                            Returning id;
+                            """,
+                            (name, username, email, password_hash, password_salt))
+                        connection.commit()
+                        return cursor.fetchone()['id']
+            except psycopg2.errors.DatabaseError as error:
                 raise DatabaseError(error)
 
     def update_user(self, user_id, **kwargs):
         query = """
                     UPDATE users
                     SET {block}
-                    WHERE id = ? """
+                    WHERE id = %s;"""
         values = []
         block_parts = []
         for name, value in kwargs.items():
@@ -142,58 +155,61 @@ class AdminSource(Source):
                 if name == 'password':
                     password_salt = str(uuid.uuid4())
                     password_hash = hash_password(value, password_salt)
-                    block_parts.extend(['password_salt = ?', 'password_hash = ?'])
+                    block_parts.extend(['password_salt = %s', 'password_hash = %s'])
                     values.extend([password_salt, password_hash])
                 else:
-                    block_parts.append('{} = ?'.format(name))
+                    block_parts.append('{} = %s'.format(name))
                     values.append(value)
         values.append(user_id)
         with self._lock:
             try:
                 with self.get_connection() as connection:
-                    cursor = connection.execute(
-                        query.format(block=', '.join(block_parts)),
-                        values
-                    )
-            except sqlite3.IntegrityError as error:
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            query.format(block=', '.join(block_parts)),
+                            values
+                        )
+                        connection.commit()
+                        if cursor.rowcount != 1:
+                            raise DatabaseError('UPDATE failed')
+            except ValueError as error:
                 raise DatabaseError(error)
-            if cursor.rowcount != 1:
-                raise DatabaseError('UPDATE failed')
 
     def delete_user(self, user_id):
         with self._lock:
-            connection = self.get_connection()
-            changes = connection.total_changes
-            with connection:
-                connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
-            if connection.total_changes - changes != 1:
-                raise DatabaseError('DELETE failed')
+            with self.get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("DELETE FROM users WHERE id = %s RETURNING id;", (user_id,))
+                    connection.commit()
+                    if cursor.rowcount != 1:
+                        raise DatabaseError('DELETE failed')
 
     def has_username(self, username):
         with self._lock:
             with self.get_connection() as connection:
-                cursor = connection.execute("""
-                    SELECT EXISTS (
-                      SELECT 1
-                      FROM users
-                      WHERE username = ? ) """, (username,))
-            row = cursor.fetchone()
-            return bool(row[0])
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT EXISTS (
+                          SELECT 1
+                          FROM users
+                          WHERE username = %s ) """, (username,))
+                    row = cursor.fetchone()
+                    return bool(row[0])
 
     def get_usernames(self):
-        with self.get_connection() as connection:
-            cursor = connection.execute("SELECT username FROM users")
-        rs = cursor.fetchall()
+        with self.get_connection().cursor() as cursor:
+            cursor.execute("SELECT id, username FROM users")
+            rs = cursor.fetchall()
         return [row['username'] for row in rs]
 
     def get_authentication_data(self, username):
-        with self.get_connection() as connection:
-            cursor = connection.execute("""
+        with self.get_connection().cursor() as cursor:
+            cursor.execute("""
                 SELECT password_hash,
                        password_salt
                 FROM users
-                WHERE username = ? """, (username, ))
-        row = cursor.fetchone()
+                WHERE username = %s """, (username, ))
+            row = cursor.fetchone()
         return self.row_to_dict(row)
 
 

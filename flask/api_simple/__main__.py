@@ -1,12 +1,11 @@
 import argparse
-import os
 
 from . import api
 from lib import util
 
 
-def main(host, port, database):
-    api.source = util.AdminSource(database)
+def main(host, port):
+    api.source = util.AdminSource(util.build_dns())
     api.app.run(host=host, port=port)
 
 
@@ -28,11 +27,6 @@ if __name__ == '__main__':
         '--port',
         default=api.PORT,
         help='server port (default: %(default)s)')
-    cmd_run.add_argument(
-        '--database',
-        default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
-        metavar='FILE',
-        help='path to database file (default: %(default)s)')
 
     # command: test
     cmd_test = subparsers.add_parser(
@@ -46,11 +40,6 @@ if __name__ == '__main__':
         help='manage database',
         description='Set up and manage database.')
     cmd_data.add_argument(
-        '--database',
-        default=os.path.join(util.DATA_DIR, util.DEFAULT_DATABASE),
-        metavar='FILE',
-        help='path to database file (default: %(default)s)')
-    cmd_data.add_argument(
         '--data-from-url',
         default=False,
         action='store_true',
@@ -63,9 +52,9 @@ if __name__ == '__main__':
         tests.run()
     elif args.command == 'data':
         from . import setup_db
-        setup_db.main(args.database, args.data_from_url)
+        setup_db.main(args.data_from_url)
     elif args.command == 'run':
-        main(args.host, args.port, args.database)
+        main(args.host, args.port)
     else:
         print('%s: error: argument commands: no command provided\n' % __name__)
         parser.print_help()

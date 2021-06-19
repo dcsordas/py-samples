@@ -5,7 +5,6 @@ import os
 import unittest
 
 from api_view import api
-from api_view import setup_db
 from lib import util
 
 
@@ -17,8 +16,8 @@ class BaseApiTestCase(unittest.TestCase):
 
     def setUp(self):
         app = Flask('test')
-        app.config['TESTING'] = True
-        app.config['DEBUG'] = False
+        app.config.testing = True
+        app.config.debug = False
         self.test_api = api.ApiServer(app)
         self.test_app = app.test_client()
 
@@ -44,15 +43,14 @@ class BaseApiTestCaseWithDB(BaseApiTestCase):
         super(BaseApiTestCaseWithDB, self).setUp()
 
         # set up database
-        connection = util.get_connection(os.path.join(util.DATA_DIR, 'test.sqlite'))
-        with connection:
-            connection.execute(setup_db.SQL_DROP_TABLE_USERS)
-        with connection:
-            connection.execute(setup_db.SQL_CREATE_TABLE_USERS)
-        util.insert_user(connection, 'one', 'test1', email='test1@example.com', password='pw1')
-        util.insert_user(connection, 'two', 'test2', email='test2@example.com', password='pw2')
-        self.test_connection = connection
-        self.test_source = util.AdminSource(os.path.join(util.DATA_DIR, 'test.sqlite'))
+        dns = util.build_dns(dbname='test')
+        with util.connection(dns) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""TRUNCATE TABLE users;""")
+                cursor.execute("""ALTER SEQUENCE users_id_seq RESTART WITH 1;""")
+            util.insert_user(connection, 'one', 'test1', email='test1@example.com', password='pw1')
+            util.insert_user(connection, 'two', 'test2', email='test2@example.com', password='pw2')
+        self.test_source = util.AdminSource(dns)
 
 
 def run():
